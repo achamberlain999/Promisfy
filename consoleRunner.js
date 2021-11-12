@@ -12,37 +12,37 @@ const TFL_BASE_URL = 'https://api.tfl.gov.uk';
 
 export default class ConsoleRunner {
 
-    promptForPostcode(callback) {
+    promptForPostcode() {
         let postcode = "NW5 1TL"
-        console.log(postcode)
-        callback(postcode)
-        return
-        readline.question('\nEnter your postcode: ', function(postcode) {
-            readline.close();
-            callback(postcode);
+        // console.log(postcode)
+        return new Promise((resolve, reject) => {
+            readline.question('\nEnter your postcode: ', function() {
+                readline.close();
+                resolve(postcode);
+            });
         });
     }
 
     displayStopPoints(stopPoints) {
-        console.log("displayStopPoints")
+        // console.log("displayStopPoints")
         stopPoints.forEach(point => {
             console.log(point.commonName);
         });
     }
 
     buildUrl(url, endpoint, parameters) {
-        console.log("buildUrl")
+        // console.log("buildUrl")
         const requestUrl = new URL(endpoint, url);
         parameters.forEach(param => requestUrl.searchParams.append(param.name, param.value));
         return requestUrl.href;
     }
 
     makeGetRequest(baseUrl, endpoint, parameters) {
-        console.log("makeGetRequest")
+        // console.log("makeGetRequest")
         const url = this.buildUrl(baseUrl, endpoint, parameters);
 
         return new Promise((resolve, reject) => {
-            console.log("Promise")
+            // console.log("Promise")
             request.get(url, (err, response, body) => {
                 if (err) {
                     reject(err)
@@ -55,45 +55,47 @@ export default class ConsoleRunner {
         }).catch((error) => console.log(error))
     }
 
-    getLocationForPostCode(postcode, callback) {
-        console.log("getLocationForPostCode")
-        this.makeGetRequest(POSTCODES_BASE_URL, `postcodes/${postcode}`, []).then(
+    getLocationForPostCode(postcode) {
+        // console.log("getLocationForPostCode")
+        return this.makeGetRequest(POSTCODES_BASE_URL, `postcodes/${postcode}`, []).then(
             function(responseBody) {
                 const jsonBody = JSON.parse(responseBody);
-                callback({ latitude: jsonBody.result.latitude, longitude: jsonBody.result.longitude });
+                return { latitude: jsonBody.result.latitude, longitude: jsonBody.result.longitude };
             }
         )
     }
 
-    getNearestStopPoints(latitude, longitude, count, callback) {
-        console.log("getNearestStopPoints")
-        this.makeGetRequest(
-            TFL_BASE_URL,
-            `StopPoint`, 
-            [
-                {name: 'stopTypes', value: 'NaptanPublicBusCoachTram'},
-                {name: 'lat', value: latitude},
-                {name: 'lon', value: longitude},
-                {name: 'radius', value: 1000},
-                {name: 'app_id', value: '' /* Enter your app id here */},
-                {name: 'app_key', value: '' /* Enter your app key here */}
-            ]).then(
-                function(responseBody) {
-                    const stopPoints = JSON.parse(responseBody).stopPoints.map(function(entity) { 
-                        return { naptanId: entity.naptanId, commonName: entity.commonName };
-                    }).slice(0, count);
-                    callback(stopPoints);
-                }
-            ).catch(() => console.log('oh noh'))
+    getNearestStopPoints(latitude, longitude, count) { 
+        return new Promise((resolve, reject) => {
+            // console.log("getNearestStopPoints")
+            return this.makeGetRequest(
+                TFL_BASE_URL,
+                `StopPoint`, 
+                [
+                    {name: 'stopTypes', value: 'NaptanPublicBusCoachTram'},
+                    {name: 'lat', value: latitude},
+                    {name: 'lon', value: longitude},
+                    {name: 'radius', value: 1000},
+                    {name: 'app_id', value: '' /* Enter your app id here */},
+                    {name: 'app_key', value: '' /* Enter your app key here */}
+                ]).then(
+                    function(responseBody) {
+                        const stopPoints = JSON.parse(responseBody).stopPoints.map(function(entity) { 
+                            return { naptanId: entity.naptanId, commonName: entity.commonName };
+                        }).slice(0, count);
+                        resolve(stopPoints);
+                    }
+                )
+        });
     }
 
     run() {
         console.log("run")
         const that = this;
-        that.promptForPostcode(function(postcode) {
+        that.promptForPostcode().then(function(postcode) {
             postcode = postcode.replace(/\s/g, '');
-            that.getLocationForPostCode(postcode, function(location) {
-                that.getNearestStopPoints(location.latitude, location.longitude, 5, function(stopPoints) {
+            that.getLocationForPostCode(postcode).then(function(location) {
+                that.getNearestStopPoints(location.latitude, location.longitude, 5).then(function(stopPoints) {
                     that.displayStopPoints(stopPoints);
                 });
             });
