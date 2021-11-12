@@ -92,13 +92,14 @@ export default class ConsoleRunner {
     run() {
         console.log("run")
         const that = this;
-        that.promptForPostcode().then(function(postcode) {
-            postcode = postcode.replace(/\s/g, '');
-            that.getLocationForPostCode(postcode).then(function(location) {
-                that.getNearestStopPoints(location.latitude, location.longitude, 5).then(function(stopPoints) {
-                    that.displayStopPoints(stopPoints);
-                });
+        that.promptForPostcode()
+            .then(function(postcode) {
+                postcode = postcode.replace(/\s/g, '');
+                return that.getLocationForPostCode(postcode);
+            }).then(function(location) {
+                return that.getNearestStopPoints(location.latitude, location.longitude, 5);
+            }).then(function(stopPoints) {
+                that.displayStopPoints(stopPoints);
             });
-        });
     }
 }
