@@ -12,10 +12,10 @@ const TFL_BASE_URL = 'https://api.tfl.gov.uk';
 
 export default class ConsoleRunner {
 
-    promptForPostcode() {
+    async promptForPostcode() {
         let postcode = "NW5 1TL"
         // console.log(postcode)
-        return new Promise((resolve, reject) => {
+        return await new Promise((resolve, reject) => {
             readline.question('\nEnter your postcode: ', function() {
                 readline.close();
                 resolve(postcode);
@@ -37,11 +37,11 @@ export default class ConsoleRunner {
         return requestUrl.href;
     }
 
-    makeGetRequest(baseUrl, endpoint, parameters) {
+    async makeGetRequest(baseUrl, endpoint, parameters) {
         // console.log("makeGetRequest")
         const url = this.buildUrl(baseUrl, endpoint, parameters);
 
-        return new Promise((resolve, reject) => {
+        return await new Promise((resolve, reject) => {
             // console.log("Promise")
             request.get(url, (err, response, body) => {
                 if (err) {
@@ -52,23 +52,22 @@ export default class ConsoleRunner {
                     resolve(body);
                 }
             });
-        }).catch((error) => console.log(error))
+        }).catch((error) => {
+            console.log(error);
+            throw new Error(error);
+        });
     }
 
-    getLocationForPostCode(postcode) {
+    async getLocationForPostCode(postcode) {
         // console.log("getLocationForPostCode")
-        return this.makeGetRequest(POSTCODES_BASE_URL, `postcodes/${postcode}`, []).then(
-            function(responseBody) {
-                const jsonBody = JSON.parse(responseBody);
-                return { latitude: jsonBody.result.latitude, longitude: jsonBody.result.longitude };
-            }
-        )
+        const responseBody = await this.makeGetRequest(POSTCODES_BASE_URL, `postcodes/${postcode}`, [])
+        const jsonBody = JSON.parse(responseBody);
+        return { latitude: jsonBody.result.latitude, longitude: jsonBody.result.longitude };
     }
 
-    getNearestStopPoints(latitude, longitude, count) { 
-        return new Promise((resolve, reject) => {
+    async getNearestStopPoints(latitude, longitude, count) {
             // console.log("getNearestStopPoints")
-            return this.makeGetRequest(
+        const responseBody = await this.makeGetRequest(
                 TFL_BASE_URL,
                 `StopPoint`, 
                 [
@@ -78,28 +77,18 @@ export default class ConsoleRunner {
                     {name: 'radius', value: 1000},
                     {name: 'app_id', value: '' /* Enter your app id here */},
                     {name: 'app_key', value: '' /* Enter your app key here */}
-                ]).then(
-                    function(responseBody) {
-                        const stopPoints = JSON.parse(responseBody).stopPoints.map(function(entity) { 
-                            return { naptanId: entity.naptanId, commonName: entity.commonName };
-                        }).slice(0, count);
-                        resolve(stopPoints);
-                    }
-                )
-        });
+                ]);
+        const stopPoints = JSON.parse(responseBody).stopPoints.map(function(entity) { 
+            return { naptanId: entity.naptanId, commonName: entity.commonName };
+        }).slice(0, count);
+        return stopPoints;
     }
 
-    run() {
-        console.log("run")
-        const that = this;
-        that.promptForPostcode()
-            .then(function(postcode) {
-                postcode = postcode.replace(/\s/g, '');
-                return that.getLocationForPostCode(postcode);
-            }).then(function(location) {
-                return that.getNearestStopPoints(location.latitude, location.longitude, 5);
-            }).then(function(stopPoints) {
-                that.displayStopPoints(stopPoints);
-            });
+    async run() {
+        // console.log("run")
+        const postcode = (await this.promptForPostcode()).replace(/\s/g, '');
+        const location = await this.getLocationForPostCode(postcode);
+        const stopPoints = await this.getNearestStopPoints(location.latitude, location.longitude, 5);
+        this.displayStopPoints(stopPoints);
     }
 }
